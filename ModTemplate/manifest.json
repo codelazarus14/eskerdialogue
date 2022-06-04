@@ -1,8 +1,8 @@
 {
-  "filename": "ModTemplate.dll",
-  "author": "Raicuparta",
-  "name": "Mod Template",
-  "uniqueName": "Raicuparta.ModTemplate",
-  "version": "0.1.0",
-  "owmlVersion": "2.3.2"
+    "filename": "ModTemplate.dll",
+    "author": "codelazarus14",
+    "name": "Mod Template",
+    "uniqueName": "codelazarus14.ModTemplate",
+    "version": "0.1.0",
+    "owmlVersion": "2.3.3"
 }
