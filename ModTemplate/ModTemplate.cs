@@ -1,10 +1,12 @@
 ﻿using OWML.Common;
 using OWML.ModHelper;
+using UnityEngine;
 
 namespace ModTemplate
 {
     public class ModTemplate : ModBehaviour
     {
+        private TextAsset _textAsset;
         private void Awake()
         {
             // You won't be able to access OWML's mod helper in Awake.
@@ -24,6 +26,21 @@ namespace ModTemplate
                 var playerBody = FindObjectOfType<PlayerBody>();
                 ModHelper.Console.WriteLine($"Found player body, and it's called {playerBody.name}!",
                     MessageType.Success);
+
+                TravelerController tc = null;
+                // Look for Esker's controller
+                TravelerController[] travelerControllers = FindObjectsOfType<TravelerController>();
+                for (int i = 0; i < travelerControllers.Length; i++)
+                {
+                    if (travelerControllers[i].name.Equals("Villager_HEA_Esker"))
+                        tc = travelerControllers[i];
+                }
+                if (tc == null)
+                    ModHelper.Console.WriteLine("Failed to find Esker's controller!", MessageType.Error);
+                _textAsset = tc._dialogueSystem._xmlCharacterDialogueAsset;
+                ModHelper.Console.WriteLine($"Found raw xml text asset: {_textAsset}", MessageType.Success);
+                // TODO: somehow modify/edit text asset in-transit with new dialogue so I don't have to create my own
+                // or figure out another way to modify the character's dialogue with CharacterDialogueTree
             };
         }
     }
