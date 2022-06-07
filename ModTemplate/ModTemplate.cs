@@ -1,12 +1,20 @@
 ﻿using OWML.Common;
 using OWML.ModHelper;
 using UnityEngine;
+using Logger = ModTemplate.Util.Logger;
 
 namespace ModTemplate
 {
     public class ModTemplate : ModBehaviour
     {
-        private TextAsset _textAsset;
+        public static ModTemplate Instance;
+
+        private EskerDialogue _eskerDialogue;
+
+        private TravelerController _eskerController;
+
+        private TextAsset _eskerText;
+
         private void Awake()
         {
             // You won't be able to access OWML's mod helper in Awake.
@@ -17,31 +25,67 @@ namespace ModTemplate
         private void Start()
         {
             // Starting here, you'll have access to OWML's mod helper.
-            ModHelper.Console.WriteLine($"My mod {nameof(ModTemplate)} is loaded!", MessageType.Success);
+
+            // for my testing convenience
+            Application.runInBackground = true;
+
+            Instance = this;
+
+            ModHelper.HarmonyHelper.AddPostfix<CharacterDialogueTree>(
+                nameof(CharacterDialogueTree.LateInitialize), 
+                typeof(Patches),
+                nameof(Patches.OnDialogueTreeInitialized));
+
+            // Load custom EskerDialogue wrapper from JSON
+            _eskerDialogue = ModHelper.Storage.Load<EskerDialogue>("eskertext.json");
+            if (string.IsNullOrEmpty(_eskerDialogue.text))
+                Logger.LogError("Error loading eskertext.json!");
+            else
+                Logger.Log("Loaded eskertext.json");
+
+            //convert to TextAsset to be used in SetTextXml
+            _eskerText = new TextAsset(_eskerDialogue.text);
+            Logger.LogSuccess($"Finished loading new dialogue");
 
             // Example of accessing game code.
             LoadManager.OnCompleteSceneLoad += (scene, loadScene) =>
             {
                 if (loadScene != OWScene.SolarSystem) return;
-                var playerBody = FindObjectOfType<PlayerBody>();
-                ModHelper.Console.WriteLine($"Found player body, and it's called {playerBody.name}!",
-                    MessageType.Success);
 
-                TravelerController tc = null;
-                // Look for Esker's controller
+                _eskerController = null;
+                // Find Esker's controller
                 TravelerController[] travelerControllers = FindObjectsOfType<TravelerController>();
                 for (int i = 0; i < travelerControllers.Length; i++)
                 {
+                    //Logger.Log($"Found traveler controller {travelerControllers[i]}");
                     if (travelerControllers[i].name.Equals("Villager_HEA_Esker"))
-                        tc = travelerControllers[i];
+                        _eskerController = travelerControllers[i];
                 }
-                if (tc == null)
-                    ModHelper.Console.WriteLine("Failed to find Esker's controller!", MessageType.Error);
-                _textAsset = tc._dialogueSystem._xmlCharacterDialogueAsset;
-                ModHelper.Console.WriteLine($"Found raw xml text asset: {_textAsset}", MessageType.Success);
-                // TODO: somehow modify/edit text asset in-transit with new dialogue so I don't have to create my own
-                // or figure out another way to modify the character's dialogue with CharacterDialogueTree
             };
         }
+
+        class Patches
+        {
+            //TODO: fix this.. beginning to feel like I shouldn't be patching LateInitialize
+            // there's an NRE generated somewhere along the way but not by any of these fields
+            // so i'm guessing it's either 1. i don't understand patching or 2. something is actually null
+            // bc of late init when i'm going to access it even tho it shouldn't be
+            public static void OnDialogueTreeInitialized()
+            {
+                if (Instance._eskerController._dialogueSystem._characterName.Equals("Esker"))
+                {
+                    Instance._eskerController._dialogueSystem.SetTextXml(Instance._eskerText);
+                    Logger.LogSuccess("Updated Esker's dialogue with new xml");
+                }
+
+            }
+        }
+
+        // Wrapper class for exporting from JSON
+        private class EskerDialogue
+        {
+            public string text { get; set; }
+        }
+
     }
 }
