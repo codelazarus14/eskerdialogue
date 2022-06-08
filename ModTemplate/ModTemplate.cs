@@ -40,6 +40,10 @@ namespace ModTemplate
                 nameof(DialogueNode.GetNextPage),
                 typeof(Patches),
                 nameof(Patches.SetPageText));
+            ModHelper.HarmonyHelper.AddPostfix<DialogueOption>(
+                nameof(DialogueOption.SetNodeId),
+                typeof(Patches),
+                nameof(Patches.SetOptionText));
 
             // Load custom EskerDialogue wrapper from JSON
             string filename = "eskertext.json";
@@ -82,13 +86,13 @@ namespace ModTemplate
 
             public static void SetPageText(DialogueNode __instance, out string mainText)
             {
-                
+
                 if (__instance._name.StartsWith("Esker"))
                 {
                     // add to mainText directly w/o call to Translate()
                     mainText = __instance._listPagesToDisplay[__instance._currentPage].Trim();
                 }
-                else 
+                else
                 {
                     // default behavior in GetNextPage() - required(?) for an out parameter
                     string key = __instance._name + __instance._listPagesToDisplay[__instance._currentPage];
@@ -96,13 +100,20 @@ namespace ModTemplate
                 }
             }
 
+            public static void SetOptionText(DialogueOption __instance)
+            {
+                if (__instance._textID.StartsWith("Esker"))
+                    // ruins all translatable strings of Esker dialogue but wtv   
+                    __instance._textID = __instance._text;
+            }
+
             public static bool HideTranslationError(TextTranslation __instance, ref string __result, string key)
             {
-                // should only affect dialogue nodes related to Esker
+                // should only affect strings related to Esker
                 string text = __instance.m_table.Get(key);
-                if (text == null && key.Contains("Esker"))
+                if (text == null)
                 {
-                    Logger.Log($"Avoiding translation error in string \"{key}\"\nI only wrote this in English lol");
+                    Logger.Log("Suppressing translation error - someone's been hard-coding strings.");
                     __result = key;
                     // skip translation method
                     return false;
