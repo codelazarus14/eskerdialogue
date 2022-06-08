@@ -1,5 +1,4 @@
-﻿using OWML.Common;
-using OWML.ModHelper;
+﻿using OWML.ModHelper;
 using UnityEngine;
 using Logger = ModTemplate.Util.Logger;
 
@@ -9,9 +8,9 @@ namespace ModTemplate
     {
         public static ModTemplate Instance;
 
-        private EskerDialogue _eskerDialogue;
-
         private TravelerController _eskerController;
+
+        private EskerDialogue _eskerDialogue;
 
         private TextAsset _eskerText;
 
@@ -24,30 +23,36 @@ namespace ModTemplate
 
         private void Start()
         {
-            // Starting here, you'll have access to OWML's mod helper.
-
             // for my testing convenience
             Application.runInBackground = true;
 
             Instance = this;
 
-            ModHelper.HarmonyHelper.AddPostfix<CharacterDialogueTree>(
-                nameof(CharacterDialogueTree.LateInitialize), 
+            ModHelper.HarmonyHelper.AddPrefix<TextTranslation>(
+                nameof(TextTranslation._Translate),
                 typeof(Patches),
-                nameof(Patches.OnDialogueTreeInitialized));
+                nameof(Patches.HideTranslationError));
+            ModHelper.HarmonyHelper.AddPostfix<CharacterDialogueTree>(
+                nameof(CharacterDialogueTree.LateInitialize),
+                typeof(Patches),
+                nameof(Patches.SetNewXml));
+            ModHelper.HarmonyHelper.AddPostfix<DialogueNode>(
+                nameof(DialogueNode.GetNextPage),
+                typeof(Patches),
+                nameof(Patches.SetPageText));
 
             // Load custom EskerDialogue wrapper from JSON
-            _eskerDialogue = ModHelper.Storage.Load<EskerDialogue>("eskertext.json");
-            if (string.IsNullOrEmpty(_eskerDialogue.text))
-                Logger.LogError("Error loading eskertext.json!");
+            string filename = "eskertext.json";
+            _eskerDialogue = ModHelper.Storage.Load<EskerDialogue>(filename);
+            if (string.IsNullOrEmpty(_eskerDialogue.Text))
+                Logger.LogError($"Error loading {filename} - text field is null or empty!");
             else
-                Logger.Log("Loaded eskertext.json");
+                Logger.Log($"Loaded {filename}");
 
             //convert to TextAsset to be used in SetTextXml
-            _eskerText = new TextAsset(_eskerDialogue.text);
-            Logger.LogSuccess($"Finished loading new dialogue");
+            _eskerText = new TextAsset(_eskerDialogue.Text);
+            Logger.LogSuccess($"Finished loading!");
 
-            // Example of accessing game code.
             LoadManager.OnCompleteSceneLoad += (scene, loadScene) =>
             {
                 if (loadScene != OWScene.SolarSystem) return;
@@ -57,7 +62,6 @@ namespace ModTemplate
                 TravelerController[] travelerControllers = FindObjectsOfType<TravelerController>();
                 for (int i = 0; i < travelerControllers.Length; i++)
                 {
-                    //Logger.Log($"Found traveler controller {travelerControllers[i]}");
                     if (travelerControllers[i].name.Equals("Villager_HEA_Esker"))
                         _eskerController = travelerControllers[i];
                 }
@@ -66,28 +70,51 @@ namespace ModTemplate
 
         class Patches
         {
-            //TODO: fix this.. beginning to feel like I shouldn't be patching LateInitialize
-            // the if and else if are both executed one after the other - so at some point this is called before Esker's initialized..
-            // but it does overwrite their dialogue.. just not perfectly (displays the Name field for the option for some reason)
-            public static void OnDialogueTreeInitialized()
+            public static void SetNewXml(CharacterDialogueTree __instance)
             {
-
-                if (Instance._eskerController._dialogueSystem._characterName is null)
-                    Logger.LogError($"Name is null for {Instance._eskerController.name}!");
-                else if (Instance._eskerController._dialogueSystem._characterName.Equals("Esker"))
+                if (__instance._characterName.Equals("Esker"))
                 {
                     Instance._eskerController._dialogueSystem.SetTextXml(Instance._eskerText);
-                    Logger.Log($"Esker's name is {Instance._eskerController._dialogueSystem._characterName}");
-                    Logger.LogSuccess("Updated Esker's dialogue with new xml");
+                    Logger.LogSuccess("Updated Esker's dialogue with new text.");
                 }
 
+            }
+
+            public static void SetPageText(DialogueNode __instance, out string mainText)
+            {
+                
+                if (__instance._name.StartsWith("Esker"))
+                {
+                    // add to mainText directly w/o call to Translate()
+                    mainText = __instance._listPagesToDisplay[__instance._currentPage].Trim();
+                }
+                else 
+                {
+                    // default behavior in GetNextPage() - required(?) for an out parameter
+                    string key = __instance._name + __instance._listPagesToDisplay[__instance._currentPage];
+                    mainText = TextTranslation.Translate(key).Trim();
+                }
+            }
+
+            public static bool HideTranslationError(TextTranslation __instance, ref string __result, string key)
+            {
+                // should only affect dialogue nodes related to Esker
+                string text = __instance.m_table.Get(key);
+                if (text == null && key.Contains("Esker"))
+                {
+                    Logger.Log($"Avoiding translation error in string \"{key}\"\nI only wrote this in English lol");
+                    __result = key;
+                    // skip translation method
+                    return false;
+                }
+                return true;
             }
         }
 
         // Wrapper class for exporting from JSON
         private class EskerDialogue
         {
-            public string text { get; set; }
+            public string Text { get; set; }
         }
 
     }
