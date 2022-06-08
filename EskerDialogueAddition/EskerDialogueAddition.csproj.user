@@ -1,0 +1,5 @@
+﻿<Project>
+  <PropertyGroup>
+    <OutputPath>$(AppData)\OuterWildsModManager\OWML\Mods\codelazarus14.EskerDialogueAddition</OutputPath>
+  </PropertyGroup>
+</Project>

@@ -1,12 +1,12 @@
 ﻿using OWML.ModHelper;
 using UnityEngine;
-using Logger = ModTemplate.Util.Logger;
+using Logger = EskerDialogueAddition.Util.Logger;
 
-namespace ModTemplate
+namespace EskerDialogueAddition
 {
-    public class ModTemplate : ModBehaviour
+    public class EskerDialogueAddition : ModBehaviour
     {
-        public static ModTemplate Instance;
+        public static EskerDialogueAddition Instance;
 
         private TravelerController _eskerController;
 
