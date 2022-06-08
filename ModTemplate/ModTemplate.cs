@@ -67,14 +67,17 @@ namespace ModTemplate
         class Patches
         {
             //TODO: fix this.. beginning to feel like I shouldn't be patching LateInitialize
-            // there's an NRE generated somewhere along the way but not by any of these fields
-            // so i'm guessing it's either 1. i don't understand patching or 2. something is actually null
-            // bc of late init when i'm going to access it even tho it shouldn't be
+            // the if and else if are both executed one after the other - so at some point this is called before Esker's initialized..
+            // but it does overwrite their dialogue.. just not perfectly (displays the Name field for the option for some reason)
             public static void OnDialogueTreeInitialized()
             {
-                if (Instance._eskerController._dialogueSystem._characterName.Equals("Esker"))
+
+                if (Instance._eskerController._dialogueSystem._characterName is null)
+                    Logger.LogError($"Name is null for {Instance._eskerController.name}!");
+                else if (Instance._eskerController._dialogueSystem._characterName.Equals("Esker"))
                 {
                     Instance._eskerController._dialogueSystem.SetTextXml(Instance._eskerText);
+                    Logger.Log($"Esker's name is {Instance._eskerController._dialogueSystem._characterName}");
                     Logger.LogSuccess("Updated Esker's dialogue with new xml");
                 }
 
