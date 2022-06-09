@@ -4,7 +4,7 @@ namespace EskerDialogueAddition.Util
 {
     // "borrowed" from https://github.com/xen-42/outer-wilds-achievement-tracker/blob/main/AchievementTracker/Util/Logger.cs
     public static class Logger
-    { 
+    {
         private static string _prefix = $"[{nameof(EskerDialogueAddition)}] Log -- ";
 
         public static void Log(string msg)

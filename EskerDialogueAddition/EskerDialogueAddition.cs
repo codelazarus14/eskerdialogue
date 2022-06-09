@@ -1,4 +1,5 @@
 ﻿using OWML.ModHelper;
+using System.Collections.Generic;
 using UnityEngine;
 using Logger = EskerDialogueAddition.Util.Logger;
 
@@ -8,17 +9,13 @@ namespace EskerDialogueAddition
     {
         public static EskerDialogueAddition Instance;
 
-        private TravelerController _eskerController;
-
-        private EskerDialogue _eskerDialogue;
-
         private TextAsset _eskerText;
+
+        private TextTranslation _translation;
 
         private void Awake()
         {
-            // You won't be able to access OWML's mod helper in Awake.
-            // So you probably don't want to do anything here.
-            // Use Start() instead.
+
         }
 
         private void Start()
@@ -28,97 +25,69 @@ namespace EskerDialogueAddition
 
             Instance = this;
 
-            ModHelper.HarmonyHelper.AddPrefix<TextTranslation>(
-                nameof(TextTranslation._Translate),
-                typeof(Patches),
-                nameof(Patches.HideTranslationError));
             ModHelper.HarmonyHelper.AddPostfix<CharacterDialogueTree>(
                 nameof(CharacterDialogueTree.LateInitialize),
                 typeof(Patches),
-                nameof(Patches.SetNewXml));
-            ModHelper.HarmonyHelper.AddPostfix<DialogueNode>(
-                nameof(DialogueNode.GetNextPage),
-                typeof(Patches),
-                nameof(Patches.SetPageText));
-            ModHelper.HarmonyHelper.AddPostfix<DialogueOption>(
-                nameof(DialogueOption.SetNodeId),
-                typeof(Patches),
-                nameof(Patches.SetOptionText));
+                nameof(Patches.UpdateEskerDialogue));
 
             // Load custom EskerDialogue wrapper from JSON
             string filename = "eskertext.json";
-            _eskerDialogue = ModHelper.Storage.Load<EskerDialogue>(filename);
-            if (string.IsNullOrEmpty(_eskerDialogue.Text))
-                Logger.LogError($"Error loading {filename} - text field is null or empty!");
-            else
-                Logger.Log($"Loaded {filename}");
-
-            //convert to TextAsset to be used in SetTextXml
-            _eskerText = new TextAsset(_eskerDialogue.Text);
-            Logger.LogSuccess($"Finished loading!");
-
-            LoadManager.OnCompleteSceneLoad += (scene, loadScene) =>
+            EskerDialogue eskerDialogue = ModHelper.Storage.Load<EskerDialogue>(filename);
+            if (string.IsNullOrEmpty(eskerDialogue.Text))
             {
-                if (loadScene != OWScene.SolarSystem) return;
+                Logger.LogError($"Error loading {filename} - text field is null or empty!");
+                return;
+            }
+            else Logger.Log($"Loaded {filename}");
 
-                _eskerController = null;
-                // Find Esker's controller
-                TravelerController[] travelerControllers = FindObjectsOfType<TravelerController>();
-                for (int i = 0; i < travelerControllers.Length; i++)
-                {
-                    if (travelerControllers[i].name.Equals("Villager_HEA_Esker"))
-                        _eskerController = travelerControllers[i];
-                }
-            };
+            _translation = FindObjectOfType<TextTranslation>();
+
+            //convert to TextAsset to be used in CharacterDialogueTree.SetTextXml()
+            _eskerText = new TextAsset(eskerDialogue.Text);
+            Logger.LogSuccess($"Finished loading!");
         }
 
         class Patches
         {
-            public static void SetNewXml(CharacterDialogueTree __instance)
+            public static void UpdateEskerDialogue(CharacterDialogueTree __instance)
             {
                 if (__instance._characterName.Equals("Esker"))
                 {
-                    Instance._eskerController._dialogueSystem.SetTextXml(Instance._eskerText);
+                    // recreate character dialogue nodes from text asset
+                    __instance.SetTextXml(Instance._eskerText);
                     Logger.LogSuccess("Updated Esker's dialogue with new text.");
+
+                    int counter = 0;
+                    foreach (DialogueNode dnode in __instance._mapDialogueNodes.Values)
+                    {
+                        // update w new page text
+                        List<DialogueText.TextBlock> blocks = dnode.DisplayTextData._listTextBlocks;
+                        foreach (DialogueText.TextBlock block in blocks)
+                        {
+                            foreach (string page in block.listPageText)
+                            {
+                                // ignore if we're not adding a new line
+                                if (Instance._translation.m_table.Get(dnode.Name + page) == null)
+                                {
+                                    Instance._translation.m_table.Insert(dnode.Name + page, page);
+                                    counter++;
+                                }
+                            }
+                        }
+                        // update w new option text
+                        List<DialogueOption> options = dnode.ListDialogueOptions;
+                        foreach (DialogueOption option in options)
+                        {
+                            if (Instance._translation.m_table.Get(option._textID) == null)
+                            {
+                                Instance._translation.m_table.Insert(option._textID, option._text);
+                                counter++;
+                            }
+                        }
+                    }
+                    Logger.Log($"Added {counter} strings to {Instance._translation.GetLanguage()} translation table");
                 }
 
-            }
-
-            public static void SetPageText(DialogueNode __instance, out string mainText)
-            {
-
-                if (__instance._name.StartsWith("Esker"))
-                {
-                    // add to mainText directly w/o call to Translate()
-                    mainText = __instance._listPagesToDisplay[__instance._currentPage].Trim();
-                }
-                else
-                {
-                    // default behavior in GetNextPage() - required(?) for an out parameter
-                    string key = __instance._name + __instance._listPagesToDisplay[__instance._currentPage];
-                    mainText = TextTranslation.Translate(key).Trim();
-                }
-            }
-
-            public static void SetOptionText(DialogueOption __instance)
-            {
-                if (__instance._textID.StartsWith("Esker"))
-                    // ruins all translatable strings of Esker dialogue but wtv   
-                    __instance._textID = __instance._text;
-            }
-
-            public static bool HideTranslationError(TextTranslation __instance, ref string __result, string key)
-            {
-                // should only affect strings related to Esker
-                string text = __instance.m_table.Get(key);
-                if (text == null)
-                {
-                    Logger.Log("Suppressing translation error - someone's been hard-coding strings.");
-                    __result = key;
-                    // skip translation method
-                    return false;
-                }
-                return true;
             }
         }
 
