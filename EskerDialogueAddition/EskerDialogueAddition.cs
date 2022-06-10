@@ -20,9 +20,6 @@ namespace EskerDialogueAddition
 
         private void Start()
         {
-            // for my testing convenience
-            Application.runInBackground = true;
-
             Instance = this;
 
             ModHelper.HarmonyHelper.AddPostfix<CharacterDialogueTree>(
